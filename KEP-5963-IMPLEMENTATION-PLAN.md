@@ -62,7 +62,7 @@ Add a constant `ResourceSliceMaxCompatibilityGroupsPerConsumption = 8` next to t
 
 ### 2. Feature gate
 
-- **`pkg/features/kube_features.go:251`** — insert a new declaration immediately before `DRAPartitionableDevices` (alphabetic / topical grouping):
+- **`pkg/features/kube_features.go:251`** — insert a new declaration alphabetically between `DRADeviceBindingConditions` and `DRADeviceTaintRules` (alphabetic / topical grouping):
   ```go
   // owner: @omeryahud
   // kep: https://kep.k8s.io/5963
