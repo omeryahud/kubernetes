@@ -83,6 +83,18 @@ func NewDeviceConsumedCapacity(deviceID DeviceID,
 	return schedulerapi.NewDeviceConsumedCapacity(deviceID, consumedCapacity)
 }
 
+// SetCompatibilityGroupRejectionRecorder wires a callback that the
+// experimental allocator invokes whenever a candidate device is rejected
+// due to a compatibility-group conflict (KEP-5963). The scheduler uses
+// this to emit the dra_compatibility_rejections_total metric. Outside
+// the scheduler the default no-op recorder applies.
+func SetCompatibilityGroupRejectionRecorder(fn func(driver, counterSet string)) {
+	if fn == nil {
+		fn = func(string, string) {}
+	}
+	experimental.CompatibilityGroupRejectionRecorder = fn
+}
+
 // Allocator calculates how to allocate a set of unallocated claims which use
 // structured parameters.
 //
