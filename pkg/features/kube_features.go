@@ -209,6 +209,14 @@ const (
 	// enabled.
 	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
 
+	// owner: @omeryahud
+	// kep: https://kep.k8s.io/5963
+	//
+	// Enables DRA drivers to express mutual-compatibility constraints
+	// between devices that consume the same counter set, so the scheduler
+	// can avoid co-allocating incompatible partitioning modes.
+	DRADeviceCompatibilityGroups featuregate.Feature = "DRADeviceCompatibilityGroups"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
@@ -1340,6 +1348,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	DRADeviceCompatibilityGroups: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRADeviceTaintRules: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Beta}, // Depends on an off-by-default beta API.
@@ -2404,6 +2416,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRAConsumableCapacity: {DynamicResourceAllocation},
 
 	DRADeviceBindingConditions: {DynamicResourceAllocation, DRAResourceClaimDeviceStatus},
+
+	DRADeviceCompatibilityGroups: {DynamicResourceAllocation, DRAPartitionableDevices},
 
 	DRADeviceTaintRules: {DRADeviceTaints}, // DynamicResourceAllocation is indirect.
 

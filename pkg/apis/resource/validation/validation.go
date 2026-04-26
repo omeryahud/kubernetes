@@ -959,7 +959,18 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
 			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
+	if len(deviceCounterConsumption.CompatibilityGroups) > 0 {
+		allErrs = append(allErrs, validateSet(deviceCounterConsumption.CompatibilityGroups,
+			resource.ResourceSliceMaxCompatibilityGroupsPerConsumption,
+			validateCompatibilityGroupName,
+			stringKey,
+			fldPath.Child("compatibilityGroups"))...)
+	}
 	return allErrs
+}
+
+func validateCompatibilityGroupName(name string, fldPath *field.Path) field.ErrorList {
+	return validateCounterName(name, fldPath)
 }
 
 var (

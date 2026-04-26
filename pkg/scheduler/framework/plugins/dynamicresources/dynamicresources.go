@@ -212,6 +212,12 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		draManager: fh.SharedDRAManager(),
 	}
 
+	if fts.EnableDRADeviceCompatibilityGroups {
+		structured.SetCompatibilityGroupRejectionRecorder(func(driver, counterSet string) {
+			schedmetrics.DRACompatibilityGroupRejectionsTotal.WithLabelValues(driver, counterSet).Inc()
+		})
+	}
+
 	return pl, nil
 }
 
@@ -655,12 +661,13 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 
 func AllocatorFeatures(fts feature.Features) structured.Features {
 	return structured.Features{
-		AdminAccess:            fts.EnableDRAAdminAccess,
-		PrioritizedList:        fts.EnableDRAPrioritizedList,
-		PartitionableDevices:   fts.EnableDRAPartitionableDevices,
-		DeviceTaints:           fts.EnableDRADeviceTaints,
-		DeviceBindingAndStatus: fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
-		ConsumableCapacity:     fts.EnableDRAConsumableCapacity,
+		AdminAccess:               fts.EnableDRAAdminAccess,
+		PrioritizedList:           fts.EnableDRAPrioritizedList,
+		PartitionableDevices:      fts.EnableDRAPartitionableDevices,
+		DeviceTaints:              fts.EnableDRADeviceTaints,
+		DeviceBindingAndStatus:    fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
+		ConsumableCapacity:        fts.EnableDRAConsumableCapacity,
+		DeviceCompatibilityGroups: fts.EnableDRADeviceCompatibilityGroups,
 	}
 }
 
