@@ -198,6 +198,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
 	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
+	dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -236,6 +237,32 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 		newSlice.Spec.Devices[i].NodeSelector = nil
 		newSlice.Spec.Devices[i].AllNodes = nil
 	}
+}
+
+func dropDisabledDRADeviceCompatibilityGroupsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups) ||
+		draDeviceCompatibilityGroupsFeatureInUse(oldSlice) {
+		return
+	}
+	for i := range newSlice.Spec.Devices {
+		for j := range newSlice.Spec.Devices[i].ConsumesCounters {
+			newSlice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = nil
+		}
+	}
+}
+
+func draDeviceCompatibilityGroupsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+	for _, device := range slice.Spec.Devices {
+		for _, cc := range device.ConsumesCounters {
+			if len(cc.CompatibilityGroups) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {

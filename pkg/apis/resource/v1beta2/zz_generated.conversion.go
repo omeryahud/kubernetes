@@ -1068,6 +1068,7 @@ func Convert_resource_DeviceConstraint_To_v1beta2_DeviceConstraint(in *resource.
 func autoConvert_v1beta2_DeviceCounterConsumption_To_resource_DeviceCounterConsumption(in *resourcev1beta2.DeviceCounterConsumption, out *resource.DeviceCounterConsumption, s conversion.Scope) error {
 	out.CounterSet = in.CounterSet
 	out.Counters = *(*map[string]resource.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 
@@ -1079,6 +1080,7 @@ func Convert_v1beta2_DeviceCounterConsumption_To_resource_DeviceCounterConsumpti
 func autoConvert_resource_DeviceCounterConsumption_To_v1beta2_DeviceCounterConsumption(in *resource.DeviceCounterConsumption, out *resourcev1beta2.DeviceCounterConsumption, s conversion.Scope) error {
 	out.CounterSet = in.CounterSet
 	out.Counters = *(*map[string]resourcev1beta2.Counter)(unsafe.Pointer(&in.Counters))
+	out.CompatibilityGroups = *(*[]string)(unsafe.Pointer(&in.CompatibilityGroups))
 	return nil
 }
 

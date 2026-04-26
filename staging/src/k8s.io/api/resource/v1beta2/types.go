@@ -297,6 +297,10 @@ const ResourceSliceMaxDeviceCounterConsumptionsPerDevice = 2
 // per device counter consumption.
 const ResourceSliceMaxCountersPerDeviceCounterConsumption = 32
 
+// Defines the maximum number of compatibility groups that can be
+// declared per device counter consumption.
+const ResourceSliceMaxCompatibilityGroupsPerConsumption = 8
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -520,6 +524,21 @@ type DeviceCounterConsumption struct {
 	// +k8s:alpha(since: "1.36")=+k8s:required
 	// +k8s:alpha(since: "1.36")=+k8s:eachKey=+k8s:format=k8s-short-name
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+
+	// CompatibilityGroups lists names of mutually-compatible groups this
+	// device belongs to for the referenced counter set. Two devices
+	// consuming from the same counter set can be co-allocated only if
+	// they share at least one group name, or if both omit the field.
+	//
+	// The relation is symmetric but not transitive.
+	// Group names are driver-defined; no cluster-wide registry is enforced.
+	//
+	// The maximum number of groups per entry is 8.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceCompatibilityGroups
+	CompatibilityGroups []string `json:"compatibilityGroups,omitempty" protobuf:"bytes,3,rep,name=compatibilityGroups"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.

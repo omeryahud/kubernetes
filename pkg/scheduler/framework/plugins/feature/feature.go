@@ -31,6 +31,7 @@ type Features struct {
 	EnableDRAConsumableCapacity                   bool
 	EnableDRADeviceTaints                         bool
 	EnableDRADeviceBindingConditions              bool
+	EnableDRADeviceCompatibilityGroups            bool
 	EnableDRAListTypeAttributes                   bool
 	EnableDRANodeAllocatableResources             bool
 	EnableDRAPartitionableDevices                 bool
@@ -67,6 +68,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRASchedulerFilterTimeout:               featureGate.Enabled(features.DRASchedulerFilterTimeout),
 		EnableDRAResourceClaimDeviceStatus:            featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
 		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
+		EnableDRADeviceCompatibilityGroups:            featureGate.Enabled(features.DRADeviceCompatibilityGroups),
 		EnableDRAWorkloadResourceClaims:               featureGate.Enabled(features.DRAWorkloadResourceClaims),
 		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),

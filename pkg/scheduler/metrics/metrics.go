@@ -174,6 +174,10 @@ var (
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
+	// DRACompatibilityGroupRejectionsTotal is only available when the
+	// DRADeviceCompatibilityGroups feature gate is enabled.
+	DRACompatibilityGroupRejectionsTotal *metrics.CounterVec
+
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
 )
@@ -213,6 +217,9 @@ func Register() {
 				DRABindingConditionsAllocationsTotal,
 				DRABindingConditionsPreBindDuration,
 			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceCompatibilityGroups) {
+			RegisterMetrics(DRACompatibilityGroupRejectionsTotal)
 		}
 	})
 }
@@ -486,6 +493,16 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"profile", "driver", "status"},
+	)
+
+	DRACompatibilityGroupRejectionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_compatibility_rejections_total",
+			Help:           "Number of DRA candidate-device rejections caused by compatibility-group conflicts, labelled by driver and counter set.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver", "counter_set"},
 	)
 
 	GetNodeHintDuration = metrics.NewHistogramVec(
