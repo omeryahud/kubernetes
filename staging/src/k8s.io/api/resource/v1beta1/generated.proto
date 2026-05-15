@@ -902,6 +902,21 @@ message DeviceCounterConsumption {
   // +k8s:alpha(since: "1.36")=+k8s:required
   // +k8s:alpha(since: "1.36")=+k8s:eachKey=+k8s:format=k8s-short-name
   map<string, Counter> counters = 2;
+
+  // CompatibilityGroups lists names of mutually-compatible groups this
+  // device belongs to for the referenced counter set. Two devices
+  // consuming from the same counter set can be co-allocated only if
+  // they share at least one group name, or if both omit the field.
+  //
+  // The relation is symmetric but not transitive.
+  // Group names are driver-defined; no cluster-wide registry is enforced.
+  //
+  // The maximum number of groups per entry is 8.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceCompatibilityGroups
+  repeated string compatibilityGroups = 3;
 }
 
 // DeviceRequest is a request for devices required for a claim.
