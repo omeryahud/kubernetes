@@ -213,8 +213,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	}
 
 	if fts.EnableDRADeviceCompatibilityGroups {
-		structured.SetCompatibilityGroupRejectionRecorder(func(driver, counterSet string) {
-			schedmetrics.DRACompatibilityGroupRejectionsTotal.WithLabelValues(driver, counterSet).Inc()
+		structured.SetCompatibilityGroupRejectionRecorder(func(driver string) {
+			schedmetrics.DRACompatibilityGroupRejectionsTotal.WithLabelValues(driver).Inc()
 		})
 	}
 

@@ -89,15 +89,10 @@ var SupportedFeatures = internal.Features{
 // device candidate is rejected because of a compatibility-group conflict
 // (KEP-5963). The scheduler wires this to a metrics counter; in unit tests
 // and when the feature is disabled it is a no-op.
-var CompatibilityGroupRejectionRecorder = func(driver, counterSet string) {}
+var CompatibilityGroupRejectionRecorder = func(driver string) {}
 
 func recordCompatibilityGroupRejection(device deviceWithID) {
-	driver := device.pool.PoolID.Driver.String()
-	counterSet := ""
-	if len(device.ConsumesCounters) > 0 {
-		counterSet = device.ConsumesCounters[0].CounterSet.String()
-	}
-	CompatibilityGroupRejectionRecorder(driver, counterSet)
+	CompatibilityGroupRejectionRecorder(device.pool.PoolID.Driver.String())
 }
 
 type Allocator struct {
@@ -1712,6 +1707,15 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			}
 		}
 
+		// Seed compatibility-group state (KEP-5963) from devices already
+		// allocated by prior claims. Runs once per pool, in the same
+		// lazy-init block as the counter cache, so the work is amortised
+		// and the seeded state is in place before any per-device compat
+		// check fires for this pool.
+		if alloc.features.DeviceCompatibilityGroups {
+			alloc.seedCompatibilityGroupsFromAllocated(pool)
+		}
+
 		// Set the available counters on the allocator so we don't have to
 		// compute this again.
 		alloc.mutex.Lock()
@@ -1994,9 +1998,6 @@ type compatState struct {
 	// has been added; further grouped devices on the same counter set
 	// are then incompatible.
 	ungroupedSeen bool
-	// devices counts how many allocating devices currently contribute
-	// to this state.
-	devices int
 }
 
 // compatRollback captures the per-counter-set state that
@@ -2057,7 +2058,6 @@ func (alloc *allocator) checkCompatibilityGroups(device deviceWithID) (bool, []c
 			existed:    existed,
 		})
 		st := prev
-		st.devices++
 		if len(dcc.CompatibilityGroups) == 0 {
 			st.ungroupedSeen = true
 			poolState[dcc.CounterSet] = st
@@ -2091,5 +2091,76 @@ func (alloc *allocator) rollbackCompatibilityGroups(rollbacks []compatRollback) 
 		if len(poolState) == 0 {
 			delete(alloc.groupsPerCounterSet, rb.pool)
 		}
+	}
+}
+
+// seedCompatibilityGroupsFromAllocated folds compatibility-group state
+// from devices already allocated in `pool` (per alloc.allocatedState)
+// into alloc.groupsPerCounterSet, so cross-claim conflicts on the same
+// pool/counterSet are caught when later devices are checked.
+//
+// Idempotent for a given pool because the caller invokes it once per
+// pool from the same lazy-init block that populates availableCounters.
+func (alloc *allocator) seedCompatibilityGroupsFromAllocated(pool *Pool) {
+	poolName := pool.PoolID.Pool
+	var poolState map[draapi.UniqueString]compatState
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				deviceID := DeviceID{
+					Driver: slice.Spec.Driver,
+					Pool:   slice.Spec.Pool.Name,
+					Device: device.Name,
+				}
+				if !alloc.allocatedState.AllocatedDevices.Has(deviceID) {
+					continue
+				}
+				for _, dcc := range device.ConsumesCounters {
+					if poolState == nil {
+						poolState = make(map[draapi.UniqueString]compatState)
+					}
+					st := poolState[dcc.CounterSet]
+					if len(dcc.CompatibilityGroups) == 0 {
+						st.ungroupedSeen = true
+					} else {
+						ds := sets.New(dcc.CompatibilityGroups...)
+						if st.groups == nil {
+							st.groups = ds
+						} else {
+							st.groups = st.groups.Intersection(ds)
+						}
+					}
+					poolState[dcc.CounterSet] = st
+				}
+			}
+		}
+	}
+	if poolState == nil {
+		return
+	}
+	alloc.mutex.Lock()
+	defer alloc.mutex.Unlock()
+	existing, ok := alloc.groupsPerCounterSet[poolName]
+	if !ok {
+		alloc.groupsPerCounterSet[poolName] = poolState
+		return
+	}
+	// Merge: persisted seed wins for fresh counterSets; for counterSets
+	// already touched by an in-flight allocating device, intersect.
+	for cs, seed := range poolState {
+		cur, present := existing[cs]
+		if !present {
+			existing[cs] = seed
+			continue
+		}
+		if seed.ungroupedSeen {
+			cur.ungroupedSeen = true
+		}
+		if cur.groups == nil {
+			cur.groups = seed.groups
+		} else if seed.groups != nil {
+			cur.groups = cur.groups.Intersection(seed.groups)
+		}
+		existing[cs] = cur
 	}
 }

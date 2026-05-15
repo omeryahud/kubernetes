@@ -499,10 +499,10 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "dra_compatibility_rejections_total",
-			Help:           "Number of DRA candidate-device rejections caused by compatibility-group conflicts, labelled by driver and counter set.",
+			Help:           "Number of DRA candidate-device rejections caused by compatibility-group conflicts, labelled by driver.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"driver", "counter_set"},
+		[]string{"driver"},
 	)
 
 	GetNodeHintDuration = metrics.NewHistogramVec(
