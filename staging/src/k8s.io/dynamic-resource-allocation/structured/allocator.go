@@ -88,9 +88,9 @@ func NewDeviceConsumedCapacity(deviceID DeviceID,
 // due to a compatibility-group conflict (KEP-5963). The scheduler uses
 // this to emit the dra_compatibility_rejections_total metric. Outside
 // the scheduler the default no-op recorder applies.
-func SetCompatibilityGroupRejectionRecorder(fn func(driver, counterSet string)) {
+func SetCompatibilityGroupRejectionRecorder(fn func(driver string)) {
 	if fn == nil {
-		fn = func(string, string) {}
+		fn = func(string) {}
 	}
 	experimental.CompatibilityGroupRejectionRecorder = fn
 }
