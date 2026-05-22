@@ -85,16 +85,6 @@ var SupportedFeatures = internal.Features{
 	DeviceCompatibilityGroups: true,
 }
 
-// CompatibilityGroupRejectionRecorder is invoked from the allocator when a
-// device candidate is rejected because of a compatibility-group conflict
-// (KEP-5963). The scheduler wires this to a metrics counter; in unit tests
-// and when the feature is disabled it is a no-op.
-var CompatibilityGroupRejectionRecorder = func(driver string) {}
-
-func recordCompatibilityGroupRejection(device deviceWithID) {
-	CompatibilityGroupRejectionRecorder(device.pool.PoolID.Driver.String())
-}
-
 type Allocator struct {
 	features       Features
 	allocatedState AllocatedState
@@ -1501,7 +1491,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		if !ok {
 			alloc.logger.V(7).Info("Device rejected by compatibility groups", "device", device.id)
 			alloc.deallocateCountersForDevice(device)
-			recordCompatibilityGroupRejection(device)
 			return false, nil, nil
 		}
 		compatRollbacks = rb
