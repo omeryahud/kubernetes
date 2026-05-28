@@ -75,13 +75,14 @@ func NewConsumedCapacityCollection() ConsumedCapacityCollection {
 // making this the variant that is used when any of those
 // are enabled.
 var SupportedFeatures = internal.Features{
-	AdminAccess:            true,
-	PrioritizedList:        true,
-	PartitionableDevices:   true,
-	DeviceTaints:           true,
-	DeviceBindingAndStatus: true,
-	ConsumableCapacity:     true,
-	ListTypeAttributes:     true,
+	AdminAccess:               true,
+	PrioritizedList:           true,
+	PartitionableDevices:      true,
+	DeviceTaints:              true,
+	DeviceBindingAndStatus:    true,
+	ConsumableCapacity:        true,
+	ListTypeAttributes:        true,
+	DeviceCompatibilityGroups: true,
 }
 
 type Allocator struct {
@@ -159,6 +160,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(claims)),
 		consumedCounters:     make(map[draapi.UniqueString]counterSets),
+		groupsPerCounterSet:  make(map[draapi.UniqueString]map[draapi.UniqueString]compatState),
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(claims)),
 		allocatingCapacity:   NewConsumedCapacityCollection(),
@@ -623,7 +625,11 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool names.
 	consumedCounters map[draapi.UniqueString]counterSets
-	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	// groupsPerCounterSet tracks compatibility-group state (KEP-5963)
+	// during one allocation attempt. Outer key is pool name; inner key
+	// is counter-set name.
+	groupsPerCounterSet map[draapi.UniqueString]map[draapi.UniqueString]compatState
+	requestData         map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
 	// and its values represent for which of a pod's claims the device will
@@ -1476,6 +1482,20 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 	}
 
+	// Compatibility-group enforcement (KEP-5963). Devices on the same
+	// counter set can only be co-allocated when their declared
+	// compatibility-group sets intersect (or both omit the field).
+	var compatRollbacks []compatRollback
+	if alloc.features.DeviceCompatibilityGroups && !skipCounterCheck && len(device.ConsumesCounters) > 0 {
+		ok, rb := alloc.checkCompatibilityGroups(device)
+		if !ok {
+			alloc.logger.V(7).Info("Device rejected by compatibility groups", "device", device.id)
+			alloc.deallocateCountersForDevice(device)
+			return false, nil, nil
+		}
+		compatRollbacks = rb
+	}
+
 	var parentRequestName string
 	var baseRequestName string
 	var subRequestName string
@@ -1580,6 +1600,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 				alloc.deallocateCountersForDevice(device)
 			}
 		}
+		if len(compatRollbacks) > 0 {
+			alloc.rollbackCompatibilityGroups(compatRollbacks)
+		}
 		// Truncate, but keep the underlying slice.
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
 		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
@@ -1672,6 +1695,15 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 					// alloc.consumedCounters
 				}
 			}
+		}
+
+		// Seed compatibility-group state (KEP-5963) from devices already
+		// allocated by prior claims. Runs once per pool, in the same
+		// lazy-init block as the counter cache, so the work is amortised
+		// and the seeded state is in place before any per-device compat
+		// check fires for this pool.
+		if alloc.features.DeviceCompatibilityGroups {
+			alloc.seedCompatibilityGroupsFromAllocated(pool)
 		}
 
 		// Set the available counters on the allocator so we don't have to
@@ -1943,4 +1975,182 @@ func containsNodeSelectorRequirement(requirements []v1.NodeSelectorRequirement, 
 		return true
 	}
 	return false
+}
+
+// compatState tracks the running compatibility-group state for a single
+// (pool, counterSet) during one allocation attempt. See checkCompatibilityGroups.
+type compatState struct {
+	// groups is the intersection of compatibility groups declared by
+	// allocating devices on this counter set so far. nil means "no
+	// grouped device has joined yet".
+	groups sets.Set[string]
+	// ungroupedSeen is true once a device with no compatibility groups
+	// has been added; further grouped devices on the same counter set
+	// are then incompatible.
+	ungroupedSeen bool
+}
+
+// compatRollback captures the per-counter-set state that
+// checkCompatibilityGroups overwrote, so a rollback can restore exactly
+// what was there before the device was folded in.
+type compatRollback struct {
+	pool       draapi.UniqueString
+	counterSet draapi.UniqueString
+	prev       compatState
+	existed    bool
+}
+
+// checkCompatibilityGroups returns true iff `device` is compatible with
+// the devices already being allocated on every counter set it consumes.
+// On success it folds the device's groups into the running state and
+// returns a list of per-counter-set rollback entries that the caller
+// must apply with rollbackCompatibilityGroups on failure of a later
+// step. On failure it leaves the running state unchanged.
+//
+// Rules (KEP-5963):
+//   - both ungrouped -> compatible
+//   - one ungrouped, one grouped -> incompatible
+//   - both grouped -> intersection must be non-empty
+func (alloc *allocator) checkCompatibilityGroups(device deviceWithID) (bool, []compatRollback) {
+	poolName := device.pool.PoolID.Pool
+	poolState, ok := alloc.groupsPerCounterSet[poolName]
+	if !ok {
+		poolState = make(map[draapi.UniqueString]compatState)
+	}
+	// First pass: validate without mutating.
+	for _, dcc := range device.ConsumesCounters {
+		st := poolState[dcc.CounterSet]
+		deviceHasGroups := len(dcc.CompatibilityGroups) > 0
+		if !deviceHasGroups {
+			if st.groups != nil {
+				return false, nil
+			}
+			continue
+		}
+		if st.ungroupedSeen {
+			return false, nil
+		}
+		if st.groups != nil {
+			deviceSet := sets.New(dcc.CompatibilityGroups...)
+			if st.groups.Intersection(deviceSet).Len() == 0 {
+				return false, nil
+			}
+		}
+	}
+	// Second pass: commit, recording the prior state for rollback.
+	rollbacks := make([]compatRollback, 0, len(device.ConsumesCounters))
+	for _, dcc := range device.ConsumesCounters {
+		prev, existed := poolState[dcc.CounterSet]
+		rollbacks = append(rollbacks, compatRollback{
+			pool:       poolName,
+			counterSet: dcc.CounterSet,
+			prev:       prev,
+			existed:    existed,
+		})
+		st := prev
+		if len(dcc.CompatibilityGroups) == 0 {
+			st.ungroupedSeen = true
+			poolState[dcc.CounterSet] = st
+			continue
+		}
+		deviceSet := sets.New(dcc.CompatibilityGroups...)
+		if st.groups == nil {
+			st.groups = deviceSet
+		} else {
+			st.groups = st.groups.Intersection(deviceSet)
+		}
+		poolState[dcc.CounterSet] = st
+	}
+	alloc.groupsPerCounterSet[poolName] = poolState
+	return true, rollbacks
+}
+
+// rollbackCompatibilityGroups restores the per-counter-set states that
+// the matching checkCompatibilityGroups call had overwritten.
+func (alloc *allocator) rollbackCompatibilityGroups(rollbacks []compatRollback) {
+	for _, rb := range rollbacks {
+		poolState, ok := alloc.groupsPerCounterSet[rb.pool]
+		if !ok {
+			continue
+		}
+		if rb.existed {
+			poolState[rb.counterSet] = rb.prev
+		} else {
+			delete(poolState, rb.counterSet)
+		}
+		if len(poolState) == 0 {
+			delete(alloc.groupsPerCounterSet, rb.pool)
+		}
+	}
+}
+
+// seedCompatibilityGroupsFromAllocated folds compatibility-group state
+// from devices already allocated in `pool` (per alloc.allocatedState)
+// into alloc.groupsPerCounterSet, so cross-claim conflicts on the same
+// pool/counterSet are caught when later devices are checked.
+//
+// Idempotent for a given pool because the caller invokes it once per
+// pool from the same lazy-init block that populates availableCounters.
+func (alloc *allocator) seedCompatibilityGroupsFromAllocated(pool *Pool) {
+	poolName := pool.PoolID.Pool
+	var poolState map[draapi.UniqueString]compatState
+	for _, resourceSlices := range [][]*draapi.ResourceSlice{pool.DeviceSlicesTargetingNode, pool.DeviceSlicesNotTargetingNode} {
+		for _, slice := range resourceSlices {
+			for _, device := range slice.Spec.Devices {
+				deviceID := DeviceID{
+					Driver: slice.Spec.Driver,
+					Pool:   slice.Spec.Pool.Name,
+					Device: device.Name,
+				}
+				if !alloc.allocatedState.AllocatedDevices.Has(deviceID) {
+					continue
+				}
+				for _, dcc := range device.ConsumesCounters {
+					if poolState == nil {
+						poolState = make(map[draapi.UniqueString]compatState)
+					}
+					st := poolState[dcc.CounterSet]
+					if len(dcc.CompatibilityGroups) == 0 {
+						st.ungroupedSeen = true
+					} else {
+						ds := sets.New(dcc.CompatibilityGroups...)
+						if st.groups == nil {
+							st.groups = ds
+						} else {
+							st.groups = st.groups.Intersection(ds)
+						}
+					}
+					poolState[dcc.CounterSet] = st
+				}
+			}
+		}
+	}
+	if poolState == nil {
+		return
+	}
+	alloc.mutex.Lock()
+	defer alloc.mutex.Unlock()
+	existing, ok := alloc.groupsPerCounterSet[poolName]
+	if !ok {
+		alloc.groupsPerCounterSet[poolName] = poolState
+		return
+	}
+	// Merge: persisted seed wins for fresh counterSets; for counterSets
+	// already touched by an in-flight allocating device, intersect.
+	for cs, seed := range poolState {
+		cur, present := existing[cs]
+		if !present {
+			existing[cs] = seed
+			continue
+		}
+		if seed.ungroupedSeen {
+			cur.ungroupedSeen = true
+		}
+		if cur.groups == nil {
+			cur.groups = seed.groups
+		} else if seed.groups != nil {
+			cur.groups = cur.groups.Intersection(seed.groups)
+		}
+		existing[cs] = cur
+	}
 }

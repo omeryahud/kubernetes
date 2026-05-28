@@ -47322,6 +47322,25 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 							},
 						},
 					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups lists names of mutually-compatible groups this device belongs to for the referenced counter set. Two devices consuming from the same counter set can be co-allocated only if they share at least one group name, or if both omit the field.\n\nThe relation is symmetric but not transitive. Group names are driver-defined; no cluster-wide registry is enforced.\n\nThe maximum number of groups per entry is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"counterSet", "counters"},
 			},
@@ -50192,6 +50211,25 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 							},
 						},
 					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups lists names of mutually-compatible groups this device belongs to for the referenced counter set. Two devices consuming from the same counter set can be co-allocated only if they share at least one group name, or if both omit the field.\n\nThe relation is symmetric but not transitive. Group names are driver-defined; no cluster-wide registry is enforced.\n\nThe maximum number of groups per entry is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"counterSet", "counters"},
 			},
@@ -52437,6 +52475,25 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"compatibilityGroups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompatibilityGroups lists names of mutually-compatible groups this device belongs to for the referenced counter set. Two devices consuming from the same counter set can be co-allocated only if they share at least one group name, or if both omit the field.\n\nThe relation is symmetric but not transitive. Group names are driver-defined; no cluster-wide registry is enforced.\n\nThe maximum number of groups per entry is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},

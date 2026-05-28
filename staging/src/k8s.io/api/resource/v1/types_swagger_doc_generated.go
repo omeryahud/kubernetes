@@ -259,9 +259,10 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceCounterConsumption = map[string]string{
-	"":           "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
-	"counterSet": "CounterSet is the name of the set from which the counters defined will be consumed.",
-	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"":                    "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+	"counterSet":          "CounterSet is the name of the set from which the counters defined will be consumed.",
+	"counters":            "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
+	"compatibilityGroups": "CompatibilityGroups lists names of mutually-compatible groups this device belongs to for the referenced counter set. Two devices consuming from the same counter set can be co-allocated only if they share at least one group name, or if both omit the field.\n\nThe relation is symmetric but not transitive. Group names are driver-defined; no cluster-wide registry is enforced.\n\nThe maximum number of groups per entry is 8.",
 }
 
 func (DeviceCounterConsumption) SwaggerDoc() map[string]string {

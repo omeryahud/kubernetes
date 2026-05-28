@@ -1422,6 +1422,15 @@ func (m *DeviceCounterConsumption) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
+	if len(m.CompatibilityGroups) > 0 {
+		for iNdEx := len(m.CompatibilityGroups) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CompatibilityGroups[iNdEx])
+			copy(dAtA[i:], m.CompatibilityGroups[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.CompatibilityGroups[iNdEx])))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if len(m.Counters) > 0 {
 		keysForCounters := make([]string, 0, len(m.Counters))
 		for k := range m.Counters {
@@ -3138,6 +3147,12 @@ func (m *DeviceCounterConsumption) Size() (n int) {
 			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
 		}
 	}
+	if len(m.CompatibilityGroups) > 0 {
+		for _, s := range m.CompatibilityGroups {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -3970,6 +3985,7 @@ func (this *DeviceCounterConsumption) String() string {
 	s := strings.Join([]string{`&DeviceCounterConsumption{`,
 		`CounterSet:` + fmt.Sprintf("%v", this.CounterSet) + `,`,
 		`Counters:` + mapStringForCounters + `,`,
+		`CompatibilityGroups:` + fmt.Sprintf("%v", this.CompatibilityGroups) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -8346,6 +8362,38 @@ func (m *DeviceCounterConsumption) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Counters[mapkey] = *mapvalue
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CompatibilityGroups", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CompatibilityGroups = append(m.CompatibilityGroups, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
