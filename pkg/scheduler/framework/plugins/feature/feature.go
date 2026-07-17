@@ -29,6 +29,7 @@ type Features struct {
 	EnableDRAPrioritizedList                           bool
 	EnableDRAAdminAccess                               bool
 	EnableDRAConsumableCapacity                        bool
+	EnableDRADeviceCompatibilityGroups                 bool
 	EnableDRAFractionalCapacityRange                   bool
 	EnableDRADeviceTaints                              bool
 	EnableDRADeviceBindingConditions                   bool
@@ -65,6 +66,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRAPrioritizedList:                           featureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                               featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRAConsumableCapacity:                        featureGate.Enabled(features.DRAConsumableCapacity),
+		EnableDRADeviceCompatibilityGroups:                 featureGate.Enabled(features.DRADeviceCompatibilityGroups),
 		EnableDRAFractionalCapacityRange:                   featureGate.Enabled(features.DRAFractionalCapacityRange),
 		EnableDRADeviceTaints:                              featureGate.Enabled(features.DRADeviceTaints),
 		EnableDRAListTypeAttributes:                        featureGate.Enabled(features.DRAListTypeAttributes),
