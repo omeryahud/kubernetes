@@ -1107,6 +1107,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
 			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
 	}
+	// CompatibilityGroups is validated declaratively.
 	return allErrs
 }
 
